@@ -1,0 +1,48 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17 setup
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Gradle setup
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Debug APK banao
+        run: |
+          F=$(find . -name settings.gradle -not -path './.git/*' | head -n 1)
+          if [ -n "$F" ]; then
+            DIR=$(dirname "$F")
+          else
+            Z=$(find . -maxdepth 2 -iname '*.zip' -not -path './.git/*' | head -n 1)
+            if [ -z "$Z" ]; then echo "ERROR: settings.gradle aur zip dono nahi mile"; ls -R | head -50; exit 1; fi
+            mkdir -p /tmp/proj && unzip -o -q "$Z" -d /tmp/proj
+            F=$(find /tmp/proj -name settings.gradle | head -n 1)
+            DIR=$(dirname "$F")
+          fi
+          cd "$DIR"
+          echo "Project folder: $(pwd)"
+          grep -n "versionName" app/build.gradle
+          gradle assembleDebug --no-daemon
+          mkdir -p /tmp/out && cp app/build/outputs/apk/debug/*.apk /tmp/out/
+
+      - name: APK upload karo
+        uses: actions/upload-artifact@v4
+        with:
+          name: MilkmanEntry-APK
+          path: /tmp/out/*.apk
